@@ -2,7 +2,9 @@ param (
     # 網站最主要使用的名稱：機器名稱、網域名稱或 IP
     [Parameter(Mandatory = $true)][string]$HostName,
     # 替代主體名稱(選擇性)，以逗號分隔的字串，例如：proxy.home.net,home.net,192.168.1.1
-    $AltSubjectNames
+    $AltSubjectNames,
+    $Password,
+    [switch]$KeepPlainPrivKey
 )
 $ErrorActionPreference = "Stop"
 
@@ -53,18 +55,22 @@ $key = [System.Console]::ReadKey($true)
 if ($key.KeyChar.ToString().ToUpper() -ne "Y") {
     exit 1
 }
-
-Write-Host "請設定一組金鑰保護密碼並記下來，未來製作及匯入憑證時會再用到它" -ForegroundColor Magenta
-while ($true) {
-    $passwd = Read-Host "請輸入金鑰保護密碼" -AsSecureString
-    $passwdPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($passwd))
-    $passwdConfirm = Read-Host "請再次輸入金鑰保護密碼以確認" -AsSecureString
-    if ($passwdPlain -ne [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($passwdConfirm))) {
-        Write-Host "密碼不一致，請重新輸入" -ForegroundColor Red
-        continue
-    }
-    else {
-        break
+if ($Password) {
+    $passwdPlain = $Password
+}
+else {
+    Write-Host "請設定一組金鑰保護密碼並記下來，未來製作及匯入憑證時會再用到它" -ForegroundColor Magenta
+    while ($true) {
+        $passwd = Read-Host "請輸入金鑰保護密碼" -AsSecureString
+        $passwdPlain = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($passwd))
+        $passwdConfirm = Read-Host "請再次輸入金鑰保護密碼以確認" -AsSecureString
+        if ($passwdPlain -ne [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($passwdConfirm))) {
+            Write-Host "密碼不一致，請重新輸入" -ForegroundColor Red
+            continue
+        }
+        else {
+            break
+        }
     }
 }
 
@@ -107,7 +113,7 @@ Write-Host "產生 CSR 檔案 $csrPath..." -ForegroundColor Yellow
 
 # 使用密碼加密私鑰
 Write-Host "加密私鑰檔案 $privKeyPath.enc..." -ForegroundColor Yellow
-# & $opensslPath enc -aes-256-cbc -salt -in $privKeyPath -out "$privKeyPath.enc" -pass pass:$passwdPlain
 & $opensslPath enc -e -aes128 -k $passwdPlain -a -iter 100 -pbkdf2 -in $privKeyPath -out "$privKeyPath.enc"
-Remove-Item $privKeyPath
-# openssl enc -d -aes128 -k 123456 -a -iter 100 -pbkdf2 -in enc_msg.txt -out out_msg.txt
+if (-Not $KeepPlainPrivKey) {
+    Remove-Item $privKeyPath
+}

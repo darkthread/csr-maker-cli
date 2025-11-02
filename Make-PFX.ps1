@@ -58,14 +58,13 @@ else {
 }
 $pfxPath = [IO.Path]::ChangeExtension($CerPath, ".pfx")
 
+$opensslArgs = @('pkcs12', '-export')
 if ($LegacyIIS) {
-    $pbeParams = "-certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -nomac"
+    $opensslArgs += @('-certpbe', 'PBE-SHA1-3DES', '-keypbe', 'PBE-SHA1-3DES', '-nomac')
 }
-else {
-    $pbeParams = ""
-}
-$cmd = "& `"$opensslPath`" pkcs12 -export $pbeParams -out `"$pfxPath`" -inkey `"$PrivKeyPath`" -in `"$pemPath`" -passout pass:$plainPasswd"
-Invoke-Expression $cmd
+$opensslArgs += @('-out', $pfxPath, '-inkey', $PrivKeyPath, '-in', $pemPath, '-passout', "pass:$plainPasswd")
+& $opensslPath @opensslArgs
+
 if ($keyIsEncrypted) {
     Remove-Item $PrivKeyPath -ErrorAction SilentlyContinue
 }
